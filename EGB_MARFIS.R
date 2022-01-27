@@ -8,7 +8,7 @@ library(ROracle)
 library(dplyr)
 library(tidyr)
 
-channel <- ROracle::dbConnect(DBI::dbDriver("Oracle"), username="username", password="password", "PTRAN")
+channel <- ROracle::dbConnect(DBI::dbDriver("Oracle"), username=oracle.username, password=oracle.password, oracle.dsn)  
 
 marfisxtab <- dbGetQuery(channel, "
                          
