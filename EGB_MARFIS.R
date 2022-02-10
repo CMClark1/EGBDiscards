@@ -10,6 +10,7 @@ library(tidyr)
 
 channel <- ROracle::dbConnect(DBI::dbDriver("Oracle"), username=oracle.username, password=oracle.password, oracle.dsn)  
 
+#Original Query Pull, incorporating MON_DOC_ID
 marfisxtab <- dbGetQuery(channel, "
                          
 select a.VR_NUMBER_FISHING, b.VESSEL_NAME, b.GROSS_TONNAGE, b.LOA, a.TRIP_ID, a.LANDED_DATE, a.LOG_EFRT_STD_INFO_ID, a.DATE_FISHED, a.GEAR_CODE, c.AREA, a.LATITUDE, a.LONGITUDE, a.LICENCE_ID, d.SFLT_DESC_ID, d.DESC_ENG, h.DATA_VALUE, 
@@ -19,7 +20,7 @@ sum(decode(a.SPECIES_CODE, 170, a.RND_WEIGHT_KGS, 0)) pollock
                          
 from marfissci.pro_spc_info a, marfissci.vessels b, marfissci.areas c, marfissci.sflt_descs d, marfissci.sflt_quotas e, marfissci.fleet_quotas f, marfissci.lic_quotas g, marfissci.mon_doc_entrd_dets h
                          
-where TO_CHAR(a.LANDED_DATE,'yyyy')=2016
+where TO_CHAR(a.LANDED_DATE,'yyyy')=2020
       and a.NAFO_UNIT_AREA_ID in (198,199,200,201,202,203,204,205)
       and a.VR_NUMBER_FISHING = b.VR_NUMBER
       and a.NAFO_UNIT_AREA_ID = c.AREA_ID
@@ -31,6 +32,34 @@ where TO_CHAR(a.LANDED_DATE,'yyyy')=2016
       and h.column_defn_id = 741
       
 group by a.VR_NUMBER_FISHING, b.VESSEL_NAME, b.GROSS_TONNAGE, b.LOA, a.TRIP_ID, a.LANDED_DATE, a.LOG_EFRT_STD_INFO_ID, a.DATE_FISHED, a.GEAR_CODE, c.AREA, a.LATITUDE, a.LONGITUDE, a.LICENCE_ID, d.SFLT_DESC_ID, d.DESC_ENG, h.DATA_VALUE")
+
+#Alternate approach to avoid figuring out Outer Join in SQL:
+marfisxtab <- dbGetQuery(channel, "
+                         
+select a.VR_NUMBER_FISHING, b.VESSEL_NAME, b.GROSS_TONNAGE, b.LOA, a.TRIP_ID, a.LANDED_DATE, a.LOG_EFRT_STD_INFO_ID, a.DATE_FISHED, a.GEAR_CODE, c.AREA, a.LATITUDE, a.LONGITUDE, a.LICENCE_ID, d.SFLT_DESC_ID, d.DESC_ENG, a.mon_doc_id,
+sum(decode(a.SPECIES_CODE, 100, a.RND_WEIGHT_KGS, 0)) cod,
+sum(decode(a.SPECIES_CODE, 110, a.RND_WEIGHT_KGS, 0)) haddock,
+sum(decode(a.SPECIES_CODE, 170, a.RND_WEIGHT_KGS, 0)) pollock
+                         
+from marfissci.pro_spc_info a, marfissci.vessels b, marfissci.areas c, marfissci.sflt_descs d, marfissci.sflt_quotas e, marfissci.fleet_quotas f, marfissci.lic_quotas g
+                         
+where TO_CHAR(a.LANDED_DATE,'yyyy')=2021
+      and a.NAFO_UNIT_AREA_ID in (198,199,200,201,202,203,204,205)
+      and a.VR_NUMBER_FISHING = b.VR_NUMBER
+      and a.NAFO_UNIT_AREA_ID = c.AREA_ID
+      and d.SFLT_DESC_ID = e.SFLT_DESC_ID
+      and e.FLEET_QUOTA_ID = f.FLEET_QUOTA_ID
+      and e.SFLT_QUOTA_ID = g.SFLT_QUOTA_ID
+      and a.LIC_QUOTA_ID = g.LIC_QUOTA_ID
+group by a.VR_NUMBER_FISHING, b.VESSEL_NAME, b.GROSS_TONNAGE, b.LOA, a.TRIP_ID, a.LANDED_DATE, a.LOG_EFRT_STD_INFO_ID, a.DATE_FISHED, a.GEAR_CODE, c.AREA, a.LATITUDE, a.LONGITUDE, a.LICENCE_ID, d.SFLT_DESC_ID, d.DESC_ENG, a.mon_doc_id")
+
+mon_docs<-dbGetQuery(channel, "select MON_DOC_ID, COLUMN_DEFN_ID, DATA_VALUE from marfissci.mon_doc_entrd_dets where column_defn_id = 741")
+
+mon_docs<-subset(mon_docs, MON_DOC_ID%in%c(marfisxtab$MON_DOC_ID))
+mon_docs$COLUMN_DEFN_ID<-NULL
+
+marfisxtab<-merge(marfisxtab, mon_docs, all.x=TRUE)
+
 
 #Add year column
 marfisxtab$YEAR <- as.numeric(substr(marfisxtab$LANDED_DATE, start = 1, stop = 4))
