@@ -14,5 +14,11 @@ data$OBSLAND <- data$OBSLAND/1000
 data$NONOBSLAND <- data$NONOBSLAND/1000
 
 #Calculate discards and then remove discard values if they are calculated as less than zero
-data$DISCARDS <- (data$MULTIPLIER*data$UNOBSERVED)-data$UNOBSERVED
-data$DISCARDS <- ifelse(data$DISCARDS>0,data$DISCARDS,"")
+
+data <- data %>%  mutate(
+  DISCARDS = case_when(
+    MULTIPLIER > 1 ~ (data$MULTIPLIER*data$UNOBSERVED)-data$UNOBSERVED))
+    
+data$DISCARDS <- ifelse(data$DISCARDS>0,data$DISCARDS,0)
+
+data$DISCARDS[is.na(data$DISCARDS)] <- 0
