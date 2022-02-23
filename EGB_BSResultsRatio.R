@@ -11,13 +11,13 @@ data$MULTIPLIER <- ifelse(data$MULTIPLIER>0,data$MULTIPLIER,"")
 
 #Convert landings (kg) to mt
 data$OBSLAND <- data$OBSLAND/1000
-data$NONOBSLAND <- data$NONOBSLAND/1000
+data$NONOBSLAND <- data$UNOBSLAND/1000
 
 #Calculate discards and then remove discard values if they are calculated as less than zero
 
 data <- data %>%  mutate(
   DISCARDS = case_when(
-    MULTIPLIER > 1 ~ (data$MULTIPLIER*data$UNOBSERVED)-data$UNOBSERVED))
+    MULTIPLIER > 1 ~ (data$MULTIPLIER*data$UNOBSLAND)-data$UNOBSLAND))
     
 data$DISCARDS <- ifelse(data$DISCARDS>0,data$DISCARDS,0)
 
