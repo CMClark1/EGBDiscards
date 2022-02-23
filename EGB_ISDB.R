@@ -10,7 +10,7 @@ channel <- ROracle::dbConnect(DBI::dbDriver("Oracle"), username=oracle.username,
 
 isdbtrips <- dbGetQuery(channel, "
 
-select a.CFV, a.VESSEL_NAME, b.TRIP, b.TRIPCD_ID, b.MARFIS_CONF_NUMBER, b.LANDING_DATE, Min(c.SETDATE) as MINDATE, Max(c.SETDATE) as MAXDATE, d.GEARCD_ID, e.SETCD_ID
+select a.CFV, a.VESSEL_NAME, b.TRIP, b.TRIPCD_ID, b.MARFIS_CONF_NUMBER, b.LANDING_DATE, Min(c.SETDATE) as MINDATE, Max(c.SETDATE) as MAXDATE, d.GEARCD_ID, e.SETCD_ID, Min(c.LATITUDE), Min(c.LONGITUDE)
 
 from isdb.isvessels a, isdb.istrips b, isdb.issetprofile c, isdb.isgears d, isdb.isfishsets e
 
@@ -26,3 +26,7 @@ group by a.CFV, a.VESSEL_NAME, b.TRIP, b.TRIPCD_ID, b.MARFIS_CONF_NUMBER, b.LAND
 having d.GEARCD_ID not in (71, 62)
 
 order by b.TRIP")
+
+isdbtrips <- rename(isdbtrips, LAT2 = 11)
+isdbtrips <- rename(isdbtrips, LON2 = 12)
+isdbtrips$LON2 <- -isdbtrips$LON2
