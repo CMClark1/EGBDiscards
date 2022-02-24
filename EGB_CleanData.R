@@ -5,6 +5,12 @@
 ####################
 
 library(dplyr)
+library(ROracle)
+library(Mar.fleets)
+library(Mar.utils)
+library(ROracle)
+library(leaflet)
+library(gstat)
 
 #Load clean MARFIS data - these files are not clean, so they should be replaced
 
@@ -32,7 +38,7 @@ marfis <- marfis %>%  mutate(
 sf::sf_use_s2(FALSE)
 
 marfis <- Mar.utils::identify_area(df=marfis, lat.field = "LAT", lon.field = "LON",
-                                            agg.poly.shp = "C:/R/zones.shp",
+                                            agg.poly.shp = "S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/zones.shp",
                                             agg.poly.field = "Id")
 
 marfis$ZONE <- as.numeric(marfis$Id)
@@ -57,16 +63,85 @@ temp <- isdbtrips %>% select(TRIP, LAT2, LON2)
 
 temp <- left_join(observed, temp, by="TRIP")
 
-observed <- Mar.utils::identify_area(df=temp, lat.field = temp$LAT2, lon.field = temp$LON2,
-                                   agg.poly.shp = "C:/R/zones.shp",
-                                   agg.poly.field = "Id")
+temp <- temp %>% select(!Id)
 
-marfis$ZONE <- as.numeric(marfis$Id)
-
+observed <- Mar.utils::identify_area(df=temp, lat.field = "LAT2", lon.field = "LON2",
+                                     agg.poly.shp = "S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/zones.shp",
+                                     agg.poly.field = "Id")
 
 ##Correct unobserved trips with missing zones
 
 unobserved <- zone_corrections %>% filter(nchar(OBS_Trip)<1)
+
+unobserved$LANDED_DATE <- lubridate::as_date(unobserved$LANDED_DATE)
+
+##Run this on each fleet type that is required for the analysis
+est_5Z_2021<- fishin_CHPs(type="MOBILE", stock = "5Z", dateStart = "2021-01-01", dateEnd= "2021-12-31", returnISDB=TRUE, useLocal = T, data.dir='C:/LocalDataDump', socks=T)
+
+chpVMS<-get_vmstracks(data=est_5Z_2021, 
+                      oracle.username= "oracle.username", 
+                      oracle.password="oracle.password", 
+                      oracle.dsn="oracle.dsn", 
+                      usepkg="roracle")
+
+#Filter VMS data using VR_NUMBER and LANDED_DATE from unobserved trips missing zone numbers
+
+table(unobserved$VR_NUMBER_FISHING) #these are the VR numbers to look for
+
+chpVMS_filter <- chpVMS %>% filter(VR_NUMBER %in% unobserved$VR_NUMBER_FISHING)
+
+quick_map(est_5Z_2021, vms = chpVMS_filter)
+
+
+#Identify Non-Commercial Trips
+
+head(isdbtrips) #Load this in script EGB_ISDB.R
+
+isdb_noncom <- isdbtrips %>% filter(SETCD_ID == 7) %>% select(TRIP, SETCD_ID)
+
+marfis <- marfis %>% rename(TRIP = OBS_Trip)
+
+marfis <- left_join(marfis, isdb_noncom, by="TRIP")
+
+noncomtrips <- marfis %>% filter(SETCD_ID == 7) #This is the data frame where the removed non-commercial trips appear
+
+marfis <- marfis %>% filter(is.na(SETCD_ID) | SETCD_ID != 7) #Data frame with non-commercial trips removed
+
+#Identify no-panel trips
+
+##Replace these with ROracle query
+sep1 <- read.csv('S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/Q12/Separator_Q12.csv')
+sep2 <- read.csv('S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/Q34/Separator_Q34.csv')
+
+separator<- rbind(sep1, sep2)
+
+sep_nopan <- separator %>% filter(GEARFCD_ID==89) %>% select(TRIP, GEARFCD_ID)
+
+marfis <- left_join(marfis, sep_nopan, by="TRIP")
+
+nopaneltrips <- marfis %>% filter(GEARFCD_ID == 89) #This is the data frame where the removed no panel trips appear
+
+marfis <- marfis %>% filter(is.na(GEARFCD_ID) | GEARFCD_ID != 89) #Data frame with no panel trips removed
+
+
+#Identify non-cod/had observed trips
+
+##Replace these with ROracle query
+sought1 <- read.csv('S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/Q12/Sought_Q12.csv')
+sought2 <- read.csv('S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/Q34/Sought_Q34.csv')
+
+sought <- rbind(sought1, sought2)
+
+sought_nocodhad <- sought %>% select(TRIP, SPECSCD_ID)
+
+marfis <- left_join(marfis, sought_nocodhad, by="TRIP") #creates many more lines of data==
+
+noncodhad <- marfis %>% filter(!SPECSCD_ID %in% c(10, 11))
+
+
+#Check cod/had ratios
+#Remove unwanted records
+#Aggregate data
 
 
 
