@@ -5,6 +5,8 @@
 ####################
 
 library(ROracle)
+library(dplyr)
+library(tidyr)
 
 channel <- ROracle::dbConnect(DBI::dbDriver("Oracle"), username=oracle.username, password=oracle.password, oracle.dsn)  
 
