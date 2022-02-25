@@ -51,6 +51,9 @@ isdb$VR_NUMBER_FISHING <- as.integer(isdb$VR_NUMBER_FISHING)
 
 #Step 3. QAQC MARFIS using ISDB data 
 
+#If there are any duplicate VRN and landed dates in ISDB, remove them.
+isdb <- distinct(isdb, VR_NUMBER_FISHING, LANDED_DATE, .keep_all = TRUE)
+
 ##Join MARFIS and ISDB based on VRN and landed date
 join <- left_join(marfis, isdb, by = c("VR_NUMBER_FISHING", "LANDED_DATE"))
 join_match <- join %>% filter(!is.na(TRIPCD_ID)) #Records that match 
@@ -69,7 +72,7 @@ isdb$start <- isdb$LANDING_DATE-2
 isdb$end <- isdb$LANDING_DATE+2
 
 join2 <- fuzzy_left_join(
-  marfis, isdb,
+  marfis2, isdb,
   by = c(
     "VR_NUMBER_FISHING" = "VR_NUMBER_FISHING",
     "LANDED_DATE" = "start",
@@ -82,13 +85,31 @@ join2_match <- join2 %>% filter(!is.na(TRIPCD_ID)) #Records that match
 join2_nomatch <- join2 %>% filter(is.na(TRIPCD_ID)) #Records that do not match
 join2_match$LANDED_DATE.x <- join2_match$LANDED_DATE.y
 
-#NEED TO ADD IN WHAT TO DO WITH join2_nomatch??
-
 #For matched dataframe with corrected dates, match trip numbers in joined MARFIS and ISDB records, and replace msising/mistake MARFIS trip numbers with ISDB trip numbers
-join_good3 <- join2_match %>% filter(join2_match$TRIP.x == join2_match$TRIP.y)
-join2_nomatch2 <- join2_match %>% filter(join2_match$TRIP.x != join2_match$TRIP.y)
-join2_nomatch2$TRIP.x <- join2_nomatch2$TRIP.y
+join_good3 <- join2_match %>% filter(join2_match$TRIP.x == join2_match$TRIP)
+join2_nomatch2 <- join2_match %>% filter(join2_match$TRIP.x != join2_match$TRIP)
+join2_nomatch2$TRIP.x <- join2_nomatch2$TRIP
 join_good4 <- join2_nomatch2
+
+#MARFIS records with no match to ISDB based on VRN and date, fall into two categories: observer records in MARFIS that have not yet been entered into the ISDB (will have a TRIP#) and non-observed trips (no TRIP#)
+
+join_good5 <- join2_nomatch %>% filter(TRIP.x == "") #These are the unobserved trips
+join_good6 <- join2_nomatch %>% filter(TRIP.x != "") #These are the observed trips not entered in the ISDB (aka ISDB errors)
+
+#For records that are in MARFIS but not in the ISDB, compare to Croft Excel file sent each year
 
 
 #Select MARFIS columns and bind the QAQC'd parts of the MARFIS dataframe back together
+
+good1 <- join_good1 %>% select(c(1:21))
+good2 <- join_good2 %>% select(c(1:21))
+good3 <- join_good3 %>% select(c(1:21))
+good4 <- join_good4 %>% select(c(1:21))
+good5 <- join_good5 %>% select(c(1:21))
+good6 <- join_good6 %>% select(c(1:21))
+
+marfis_qaqc <- rbind(good1, good2,
+                  setNames(good3, names(good2)),
+                  setNames(good4, names(good2)),
+                  setNames(good5, names(good2)),
+                  setNames(good6, names(good2)))
