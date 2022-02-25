@@ -96,9 +96,6 @@ join_good4 <- join2_nomatch2
 join_good5 <- join2_nomatch %>% filter(TRIP.x == "") #These are the unobserved trips
 join_good6 <- join2_nomatch %>% filter(TRIP.x != "") #These are the observed trips not entered in the ISDB (aka ISDB errors)
 
-#For records that are in MARFIS but not in the ISDB, compare to Croft Excel file sent each year
-
-
 #Select MARFIS columns and bind the QAQC'd parts of the MARFIS dataframe back together
 
 good1 <- join_good1 %>% select(c(1:21))
