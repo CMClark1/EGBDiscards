@@ -12,17 +12,12 @@ library(ROracle)
 library(leaflet)
 library(gstat)
 
-#Load clean MARFIS data - these files are not clean, so they should be replaced
+#Load QAQC'd marfis data from file EGB_QAQC.R
 
-marfis1 <- read.csv('S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/Q12/MARFISXTAB_Q12_CC.csv')
-marfis2 <- read.csv('S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/Q34/MARFISXTAB_Q34_CC.csv')
-
-marfis <- rbind(marfis1, marfis2)
-
-marfis <- marfis %>% filter(!is.na(Year))
+head(marfis_qaqc)
 
 #Add fleet ("SECTOR") column
-marfis <- marfis %>%  mutate(
+marfis <- marfis_qaqc %>%  mutate(
   SECTOR = case_when(
     SFLT_DESC_ID %in% c(90:95, 8976, 8977, 9318, 9319, 10865, 10866, 12305, 12195) ~ 90 #New Fleet Desc 90 (FG<45’) 
     , SFLT_DESC_ID %in% c(89, 9317) ~ 89 #New Fleet Desc 89 (HL) (Gear = 41 so not handline)
@@ -43,6 +38,8 @@ marfis <- Mar.utils::identify_area(df=marfis, lat.field = "LAT", lon.field = "LO
 
 marfis$ZONE <- as.numeric(marfis$Id)
 
+marfis <- marfis %>% select(!Id)
+
 #Correct zone if missing or 0 
 
 ##Create two dataframes, one that is correct and one that needs corrections
@@ -53,9 +50,9 @@ zone_corrections <- marfis %>% filter(is.na(ZONE))
 
 ##Correct observed trips with missing zones
 
-observed <- zone_corrections %>% filter(nchar(OBS_Trip)>1)
+observed <- zone_corrections %>% filter(nchar(TRIP.x)>1)
 
-observed <- rename(observed, TRIP = OBS_Trip)
+observed <- rename(observed, TRIP = TRIP.x)
 
 head(isdbtrips) #Loaded in the file EGB_ISDB.R
 
@@ -63,15 +60,17 @@ temp <- isdbtrips %>% select(TRIP, LAT2, LON2)
 
 temp <- left_join(observed, temp, by="TRIP")
 
-temp <- temp %>% select(!Id)
-
 observed <- Mar.utils::identify_area(df=temp, lat.field = "LAT2", lon.field = "LON2",
                                      agg.poly.shp = "S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/zones.shp",
                                      agg.poly.field = "Id")
 
+observed$ZONE <- observed$Id
+
+observed <- observed %>% select(!Id)
+
 ##Correct unobserved trips with missing zones
 
-unobserved <- zone_corrections %>% filter(nchar(OBS_Trip)<1)
+unobserved <- zone_corrections %>% filter(nchar(TRIP.x)<1)
 
 unobserved$LANDED_DATE <- lubridate::as_date(unobserved$LANDED_DATE)
 
@@ -79,14 +78,12 @@ unobserved$LANDED_DATE <- lubridate::as_date(unobserved$LANDED_DATE)
 est_5Z_2021<- fishin_CHPs(type="MOBILE", stock = "5Z", dateStart = "2021-01-01", dateEnd= "2021-12-31", returnISDB=TRUE, useLocal = T, data.dir='C:/LocalDataDump', socks=T)
 
 chpVMS<-get_vmstracks(data=est_5Z_2021, 
-                      oracle.username= "oracle.username", 
-                      oracle.password="oracle.password", 
-                      oracle.dsn="oracle.dsn", 
+                      oracle.username= oracle.username, 
+                      oracle.password=oracle.password, 
+                      oracle.dsn=oracle.dsn, 
                       usepkg="roracle")
 
 #Filter VMS data using VR_NUMBER and LANDED_DATE from unobserved trips missing zone numbers
-
-table(unobserved$VR_NUMBER_FISHING) #these are the VR numbers to look for
 
 chpVMS_filter <- chpVMS %>% filter(VR_NUMBER %in% unobserved$VR_NUMBER_FISHING)
 
