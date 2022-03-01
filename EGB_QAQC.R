@@ -127,6 +127,7 @@ names(marfis_error2) <- names(marfis_error1)
 marfis_errors <- rbind(marfis_error1, marfis_error2) #Observed trips entered in MARFIS that do not match the ISDB.
 
 marfis_errors_missing <- marfis_errors %>% select(VR_NUMBER_FISHING, TRIP_ID, LANDED_DATE, TRIP.x, ISDBTRIP) %>% filter(TRIP.x == "")
+marfis_errors_missing <- distinct(marfis_errors_missing, VR_NUMBER_FISHING, TRIP_ID, LANDED_DATE, TRIP.x, ISDBTRIP, .keep_all = TRUE)
 write.csv(marfis_errors_missing, "marfis_missing.csv") #File sent to CDD to correct missing MARFIS trip numbers
 
 marfis_errors_incorrect <- marfis_errors %>% select(VR_NUMBER_FISHING, LANDED_DATE, TRIP.x) %>% filter(TRIP.x != "")
