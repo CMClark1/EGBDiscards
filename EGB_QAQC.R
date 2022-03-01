@@ -62,8 +62,10 @@ join_nomatch <- join %>% filter(is.na(TRIPCD_ID)) #Records that don't match
 #For MARFIS data that did match ISDB based on VRN and landed date, match trip numbers in joined MARFIS and ISDB records, and replace missing/mistake MARFIS trip numbers with ISDB trip numbers
 join_good1 <- join_match %>% filter(join_match$TRIP.x == join_match$TRIP.y)
 join_nomatch2 <- join_match %>% filter(join_match$TRIP.x != join_match$TRIP.y)
-marfis_error1 <- join_nomatch2 %>% mutate(COMMENT = "MARFIS trip should equal ISDB trip")
-join_nomatch2$TRIP.x <- join_nomatch2$TRIP.y
+marfis_error1 <- join_nomatch2
+marfis_error1$COMMENT <- ifelse(marfis_error1$TRIP.x == "", "MARFIS trip missing", "MARFIS trip incorrect")
+join_nomatch2$TRIP.x <- ifelse(join_nomatch2$TRIP.x == "", join_nomatch2$TRIP.y, join_nomatch2$TRIP.x)
+join_nomatch2$TRIP.x <- join_nomatch2$TRIP.y #Use this to replace MARFIS values with those from ISDB, if trusted.
 join_good2 <- join_nomatch2
 
 #For MARFIS data that did not match ISDB based on VRN and landed date, match MARFIS data to ISDB data +/- 2 days. Do not replace MARFIS dates with ISDB dates.
@@ -88,8 +90,10 @@ join2_nomatch <- join2 %>% filter(is.na(TRIPCD_ID)) #Records that do not match
 #For matched dataframe, match trip numbers in joined MARFIS and ISDB records, and replace missing/mistake MARFIS trip numbers with ISDB trip numbers
 join_good3 <- join2_match %>% filter(join2_match$TRIP.x == join2_match$TRIP)
 join2_nomatch2 <- join2_match %>% filter(join2_match$TRIP.x != join2_match$TRIP)
-marfis_error2 <- join2_nomatch2 %>% mutate(COMMENT = "MARFIS trip should equal ISDB trip")
-join2_nomatch2$TRIP.x <- join2_nomatch2$TRIP
+marfis_error2 <- join2_nomatch2
+marfis_error2$COMMENT <- ifelse(marfis_error2$TRIP.x == "", "MARFIS trip missing", "MARFIS trip incorrect")
+join2_nomatch2$TRIP.x <- ifelse(join2_nomatch2$TRIP.x == "", join2_nomatch2$TRIP, join2_nomatch2$TRIP.x)
+join2_nomatch2$TRIP.x <- join2_nomatch2$TRIP #Use this to replace MARFIS values with those from ISDB, if trusted.
 join_good4 <- join2_nomatch2
 
 #MARFIS records with no match to ISDB based on VRN and date, fall into two categories: observer records in MARFIS that have not yet been entered into the ISDB (will have a TRIP#) and non-observed trips (no TRIP#)
@@ -115,12 +119,22 @@ marfis_qaqc <- rbind(good1, good2,
 #MARFIS and ISDB errors to report
 
 #MARFIS errors
-marfis_error1 <- marfis_error1 %>% rename(ISDBTRIP = TRIP.y) %>% select(c(1:21), ISDBTRIP)
-marfis_error2 <- marfis_error2 %>% rename(ISDBTRIP = TRIP) %>% select(c(1:21), ISDBTRIP)
+marfis_error1 <- marfis_error1 %>% rename(ISDBTRIP = TRIP.y) %>% select(c(1:21, 33), ISDBTRIP)
+marfis_error2 <- marfis_error2 %>% rename(ISDBTRIP = TRIP) %>% select(c(1:21, 37), ISDBTRIP)
 
 names(marfis_error2) <- names(marfis_error1)
 
-marfis_errors <- rbind(marfis_error1, marfis_error2)
+marfis_errors <- rbind(marfis_error1, marfis_error2) #Observed trips entered in MARFIS that do not match the ISDB.
+
+marfis_errors_missing <- marfis_errors %>% select(VR_NUMBER_FISHING, LANDED_DATE, TRIP.x) %>% filter(TRIP.x == "")
+write.csv(marfis_errors_missing, "marfis_missing.csv") #File sent to CDD to correct missing MARFIS trip numbers
+
+marfis_errors_incorrect <- marfis_errors %>% select(VR_NUMBER_FISHING, LANDED_DATE, TRIP.x) %>% filter(TRIP.x != "")
+isdb_check <- isdb %>% filter(TRIP %in% marfis_errors_incorrect$ISDBTRIP) 
+write.csv(isdb_check, "isdb_check.csv") #File sent to observer program to check if VRN, date landed, and trip number are correct.
+
 
 ##ISDB errors
-isdb_errors <- good6 %>% mutate(COMMENT = "trip entered in MARFIS but not ISDB") #These are the observed trips entered in MARFIS but not entered in the ISDB
+isdb_errors <- good6 %>% mutate(COMMENT = "trip entered in MARFIS but not ISDB") #Observed trips entered in MARFIS but not entered in the ISDB
+
+write.csv(isdb_errors, "isdb_missing.csv") #File sent to observer program as outstanding 
