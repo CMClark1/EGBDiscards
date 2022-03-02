@@ -116,7 +116,7 @@ marfis_qaqc <- rbind(good1, good2,
                   setNames(good5, names(good2)),
                   setNames(good6, names(good2)))
 
-#MARFIS and ISDB errors to report
+#MARFIS and ISDB errors to report to CDD and Observer Program
 
 #MARFIS errors
 marfis_error1 <- marfis_error1 %>% rename(ISDBTRIP = TRIP.y) %>% select(c(1:21, 33), ISDBTRIP)
@@ -130,11 +130,11 @@ marfis_errors_missing <- marfis_errors %>% select(VR_NUMBER_FISHING, TRIP_ID, LA
 marfis_errors_missing <- distinct(marfis_errors_missing, VR_NUMBER_FISHING, TRIP_ID, LANDED_DATE, TRIP.x, ISDBTRIP, .keep_all = TRUE)
 write.csv(marfis_errors_missing, "marfis_missing.csv") #File sent to CDD to correct missing MARFIS trip numbers
 
-marfis_errors_incorrect <- marfis_errors %>% select(VR_NUMBER_FISHING, LANDED_DATE, TRIP.x) %>% filter(TRIP.x != "")
-isdb_check <- isdb %>% filter(TRIP %in% marfis_errors_incorrect$ISDBTRIP) 
+marfis_errors_incorrect <- marfis_errors %>% select(VR_NUMBER_FISHING, TRIP_ID, LANDED_DATE, TRIP.x, ISDBTRIP) %>% filter(TRIP.x != "")
+isdb_check <- isdb %>% filter(TRIP %in% marfis_errors_incorrect$ISDBTRIP) %>% select(VR_NUMBER_FISHING, TRIP, LANDING_DATE)
 write.csv(isdb_check, "isdb_check.csv") #File sent to observer program to check if VRN, date landed, and trip number are correct.
 
 ##ISDB errors
-isdb_errors <- good6 %>% mutate(COMMENT = "trip entered in MARFIS but not ISDB") #Observed trips entered in MARFIS but not entered in the ISDB
-
-write.csv(isdb_errors, "isdb_missing.csv") #File sent to observer program as outstanding 
+isdb_errors <- good6 %>% mutate(COMMENT = "trip entered in MARFIS but not ISDB") %>%
+  distinct(VR_NUMBER_FISHING.x, TRIP_ID, LANDED_DATE.x, TRIP.x)#Observed trips entered in MARFIS but not entered in the ISDB
+write.csv(isdb_errors, "isdb_missing.csv") #File sent to observer program as outstanding data not yet entered
