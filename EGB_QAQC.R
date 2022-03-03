@@ -11,10 +11,7 @@ library(fuzzyjoin)
 
 #Step 1. Load MARFIS data from Access query (to be replaced with EGB_MARFIS.R code once finished)
 
-marfis1 <- read.csv('S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/Q12/MARFISXTAB_Q12.csv')
-marfis2 <- read.csv('S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/Q34/MARFISXTAB_Q34.csv')
-
-marfis <- rbind(marfis1, marfis2)
+marfis <- read.csv('S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/MARFISXTab_Q1234_March3pull.csv')
 
 marfis$LANDED_DATE <- dmy(marfis$LANDED_DATE)
 
@@ -128,13 +125,16 @@ marfis_errors <- rbind(marfis_error1, marfis_error2) #Observed trips entered in 
 
 marfis_errors_missing <- marfis_errors %>% select(VR_NUMBER_FISHING, TRIP_ID, LANDED_DATE, TRIP.x, ISDBTRIP) %>% filter(TRIP.x == "")
 marfis_errors_missing <- distinct(marfis_errors_missing, VR_NUMBER_FISHING, TRIP_ID, LANDED_DATE, TRIP.x, ISDBTRIP, .keep_all = TRUE)
-write.csv(marfis_errors_missing, "marfis_missing.csv") #File sent to CDD to correct missing MARFIS trip numbers
+
+#write.csv(marfis_errors_missing, "marfis_missing.csv") #File sent to CDD to correct missing MARFIS trip numbers
 
 marfis_errors_incorrect <- marfis_errors %>% select(VR_NUMBER_FISHING, TRIP_ID, LANDED_DATE, TRIP.x, ISDBTRIP) %>% filter(TRIP.x != "")
 isdb_check <- isdb %>% filter(TRIP %in% marfis_errors_incorrect$ISDBTRIP) %>% select(VR_NUMBER_FISHING, TRIP, LANDING_DATE)
-write.csv(isdb_check, "isdb_check.csv") #File sent to observer program to check if VRN, date landed, and trip number are correct.
+#write.csv(isdb_check, "isdb_check.csv") #File sent to observer program to check if VRN, date landed, and trip number are correct.
 
 ##ISDB errors
 isdb_errors <- good6 %>% mutate(COMMENT = "trip entered in MARFIS but not ISDB") %>%
   distinct(VR_NUMBER_FISHING.x, TRIP_ID, LANDED_DATE.x, TRIP.x)#Observed trips entered in MARFIS but not entered in the ISDB
-write.csv(isdb_errors, "isdb_missing.csv") #File sent to observer program as outstanding data not yet entered
+#write.csv(isdb_errors, "isdb_missing.csv") #File sent to observer program as outstanding data not yet entered
+
+rm(list=setdiff(ls(), "marfis_qaqc"))
