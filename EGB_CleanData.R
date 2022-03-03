@@ -1,6 +1,6 @@
 ####################
 # Assign Fleet and Zone
-# Caira Clark
+# Caira Clark and Irene Andrushchenko
 # 22 February 2021
 ####################
 
@@ -12,11 +12,11 @@ library(ROracle)
 library(leaflet)
 library(gstat)
 
-#Load QAQC'd marfis data from file EGB_QAQC.R
+###Load QAQC'd marfis data from file EGB_QAQC.R----------------------
 
 head(marfis_qaqc)
 
-#Add fleet ("SECTOR") column
+###Step 4. Add fleet ("SECTOR") column--------------------
 marfis <- marfis_qaqc %>%  mutate(
   SECTOR = case_when(
     SFLT_DESC_ID %in% c(90:95, 8976, 8977, 9318, 9319, 10865, 10866, 12305, 12195) ~ 90 #New Fleet Desc 90 (FG<45’) 
@@ -28,7 +28,7 @@ marfis <- marfis_qaqc %>%  mutate(
     , SFLT_DESC_ID %in% c(311, 1523) ~ 311 #New Fleet Desc 311(MG 65’ to 100’)
     , SFLT_DESC_ID %in% c(3328) ~ 3328) ) #New Fleet Desc 3328 (First Nations)
 
-#Assign zones (based on a script from Mike)
+###Step 5. Assign zones (based on a script from Mike)--------------
 
 sf::sf_use_s2(FALSE)
 
@@ -40,7 +40,7 @@ marfis$ZONE <- as.numeric(marfis$Id)
 
 marfis <- marfis %>% select(!Id)
 
-#Correct zone if missing or 0 
+###Step 6. Correct zone if missing or 0-------------------
 
 ##Create two dataframes, one that is correct and one that needs corrections
 
@@ -90,7 +90,7 @@ chpVMS_filter <- chpVMS %>% filter(VR_NUMBER %in% unobserved$VR_NUMBER_FISHING)
 quick_map(est_5Z_2021, vms = chpVMS_filter)
 
 
-#Identify Non-Commercial Trips
+###Step 7. Identify Non-Commercial Trips--------------------
 
 head(isdbtrips) #Load this in script EGB_ISDB.R
 
@@ -104,41 +104,61 @@ noncomtrips <- marfis %>% filter(SETCD_ID == 7) #This is the data frame where th
 
 marfis <- marfis %>% filter(is.na(SETCD_ID) | SETCD_ID != 7) #Data frame with non-commercial trips removed
 
-#Identify no-panel trips
+###Step 8. Identify no-panel trips---------------------------
 
-##Replace these with ROracle query
-sep1 <- read.csv('S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/Q12/Separator_Q12.csv')
-sep2 <- read.csv('S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/Q34/Separator_Q34.csv')
+separator <- dbGetQuery(channel, "select a.CFV, a.VESSEL_NAME, b.TRIP, b.LANDING_DATE, c.GEARCD_ID, d.GEARFCD_ID, Count(e.SET_NO)
 
-separator<- rbind(sep1, sep2)
+from isdb.isvessels a, isdb.istrips b, isdb.isgears c, isdb.isgearfeatures d, isdb.isfishsets e, isdb.issetprofile f
+
+where b.VESS_ID = a.VESS_ID
+and f.FISHSET_ID = e.FISHSET_ID
+and b.TRIP_ID = e.TRIP_ID
+and e.GEAR_ID = c.GEAR_ID
+and c.GEAR_ID = d.GEAR_ID
+and TO_CHAR(b.LANDING_DATE,'yyyy')=2021 
+and e.NAFAREA_ID like '5Z%'
+and f.PNTCD_ID=2
+and c.GEARCD_ID=12
+and d.GEARFCD_ID in (89, 90)
+
+group by a.CFV, a.VESSEL_NAME, b.TRIP, b.LANDING_DATE, c.GEARCD_ID, d.GEARFCD_ID
+
+")
 
 sep_nopan <- separator %>% filter(GEARFCD_ID==89) %>% select(TRIP, GEARFCD_ID)
 
-marfis <- left_join(marfis, sep_nopan, by="TRIP")
+marfis <- left_join(marfis, sep_nopan, by=c("TRIP.x" = "TRIP"))
 
 nopaneltrips <- marfis %>% filter(GEARFCD_ID == 89) #This is the data frame where the removed no panel trips appear
 
 marfis <- marfis %>% filter(is.na(GEARFCD_ID) | GEARFCD_ID != 89) #Data frame with no panel trips removed
 
 
-#Identify non-cod/had observed trips
 
-##Replace these with ROracle query
-sought1 <- read.csv('S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/Q12/Sought_Q12.csv')
-sought2 <- read.csv('S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/Q34/Sought_Q34.csv')
+###Step 9. Identify non-cod/had observed trips-------------------------
 
-sought <- rbind(sought1, sought2)
+sought <- dbGetQuery(channel, "select a.CFV, a.VESSEL_NAME, b.TRIP, c.GEARCD_ID, b.LANDING_DATE, d.SPECSCD_ID, d.SET_NO, e.SETDATE
 
-noncodhad <- sought %>% group_by(TRIP) %>% filter(!SPECSCD_ID %in% c(10,11)) #non cod/had directed sets
+from isdb.isvessels a, isdb.istrips b, isdb.isgears c, isdb.isfishsets d, isdb.issetprofile e
 
+where b.VESS_ID = a.VESS_ID
+and e.FISHSET_ID = d.FISHSET_ID
+and b.TRIP_ID = d.TRIP_ID
+and d.GEAR_ID = c.GEAR_ID
+and TO_CHAR(b.LANDING_DATE,'yyyy')=2021 
+and d.NAFAREA_ID like '5Z%'
+and e.PNTCD_ID in (1,2)
+and d.SETCD_ID=1
 
+group by a.CFV, a.VESSEL_NAME, b.TRIP, c.GEARCD_ID, b.LANDING_DATE, d.SPECSCD_ID, d.SET_NO, e.SETDATE")
 
-marfis <- left_join(marfis, sought_nocodhad, by="TRIP") #creates many more lines of data
+noncodhad <- sought %>% group_by(TRIP) %>% filter(!SPECSCD_ID %in% c(10,11)) %>% select(TRIP, SPECSCD_ID) %>% distinct(TRIP, SPECSCD_ID, .keep_all = TRUE)
 
-noncodhad <- marfis %>% filter(!SPECSCD_ID %in% c(10, 11))
+marfis <- left_join(marfis, noncodhad, by=c("TRIP.x" = "TRIP"))
 
+noncodhad <- marfis %>% filter(!SPECSCD_ID %in% c(10, 11) & !is.na(noncodhad$SPECSCD_ID))
 
-#Check cod/had ratios and pollock ratios
+###Step 10. Check cod/had ratios and pollock ratios---------------------
 
 df <- marfis
 df$X100[is.na(df$X100)] <- 0 #replace NAs with zero
@@ -206,16 +226,17 @@ pol_directed <- df %>% filter(pol_ratio == "TRUE") #dataframe with pollock direc
 haddock_directed <- df %>% filter(pol_ratio == "FALSE") #dataframe with haddock directed sets
 
 
-#Remove unwanted records
+###Step 11. Remove unwanted records----------------------------
 
 #quarters with 100% observer coverage
-#cod directed sets or trips
-#pollock directed sets or trips
-#no panel trips
-#non-commercial trips
+noncodhad #sets directed for species other than cod or haddock
+cod_directed #cod directed sets or trips
+pol_directed #pollock directed sets or trips
+nopaneltrips #no panel trips
+noncomtrips #non-commercial trips
 #trips with no zones
 
-#Aggregate data
+###Step 12. Aggregate data----------------------------------
 
 
 
