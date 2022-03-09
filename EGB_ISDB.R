@@ -29,6 +29,6 @@ having d.GEARCD_ID not in (71, 62)
 
 order by b.TRIP")
 
-isdbtrips <- rename(isdbtrips, LAT2 = 11)
-isdbtrips <- rename(isdbtrips, LON2 = 12)
+isdbtrips <- dplyr::rename(isdbtrips, LAT2 = 11)
+isdbtrips <- dplyr::rename(isdbtrips, LON2 = 12)
 isdbtrips$LON2 <- -isdbtrips$LON2
