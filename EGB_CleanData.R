@@ -264,18 +264,37 @@ haddock_directed <- df %>% filter(pol_ratio == "FALSE") #dataframe with haddock 
 
 rm(df, df2, cod_directed1, cod_directed2)
 
-###Step 11. Remove unwanted records----------------------------
+###Step 11a. Determine quarters with 100% observer coverage---------------
+
+head(haddock_directed)
+
+
+###Step 11b. Remove unwanted records----------------------------
 
 #quarters with 100% observer coverage
 
-noncodhad #sets directed for species other than cod or haddock
-cod_directed #cod directed sets or trips
-pol_directed #pollock directed sets or trips
-nopaneltrips #no panel trips
-noncomtrips #non-commercial trips
-noZone #trips with no zones
+rm1 <- noncodhad %>% select(c(1:23)) #sets directed for species other than cod or haddock
+rm2 <- cod_directed %>% select(c(1:23)) #cod directed sets or trips
+rm3 <- pol_directed %>% select(c(1:23)) #pollock directed sets or trips
+rm4 <- nopaneltrips %>% select(c(1:23)) #no panel trips
+rm5 <- noncomtrips %>% select(c(1:23)) #non-commercial trips
+rm6 <- noZone %>% select(c(1:23)) #trips with no zones
+
+removed <- rbind(rm1,
+                     setNames(rm2, names(rm1)),
+                     setNames(rm3, names(rm1)),
+                     setNames(rm4, names(rm1)),
+                     setNames(rm5, names(rm1)),
+                     setNames(rm6, names(rm1)))
+
+rm(rm1, rm2, rm3, rm4, rm5, rm6)
 
 ###Step 12. Aggregate data----------------------------------
 
+head(marfis) #replace with appropriate dataframe after I figure out the directed issue
+
+aggregated <- marfis %>%
+  group_by(VR_NUMBER_FISHING, VESSEL_NAME.x, LICENCE_ID, TC, LC, TRIP_ID, LANDED_DATE, GEAR_CODE, Q, TRIP, ZONE, SECTOR) %>%
+  dplyr::summarize(COD = sum(X100, na.rm=TRUE), HAD = sum(X110, na.rm=TRUE), POL = sum(X170, na.rm=TRUE)) 
 
 
