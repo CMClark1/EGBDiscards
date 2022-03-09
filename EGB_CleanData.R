@@ -28,6 +28,8 @@ marfis <- marfis_qaqc %>%  mutate(
     , SFLT_DESC_ID %in% c(311, 1523) ~ 311 #New Fleet Desc 311(MG 65’ to 100’)
     , SFLT_DESC_ID %in% c(3328) ~ 3328) ) #New Fleet Desc 3328 (First Nations)
 
+rm(marfis_qaqc)
+
 ###Step 5. Assign zones (based on a script from Mike)--------------
 
 sf::sf_use_s2(FALSE)
@@ -45,14 +47,12 @@ marfis <- marfis %>% select(!Id)
 ##Create two dataframes, one that is correct and one that needs corrections
 
 zone_correct <- marfis %>% filter(!is.na(ZONE))
-
 zone_corrections <- marfis %>% filter(is.na(ZONE))
 
 ##Correct observed trips with missing zones
 
 observed <- zone_corrections %>% filter(nchar(TRIP.x)>1)
-
-observed <- rename(observed, TRIP = TRIP.x)
+observed <- dplyr::rename(observed, TRIP = TRIP.x)
 
 head(isdbtrips) #Loaded in the file EGB_ISDB.R
 
@@ -68,43 +68,76 @@ observed$ZONE <- observed$Id
 
 observed <- observed %>% select(!Id)
 
+rm(temp)
+
 ##Correct unobserved trips with missing zones
 
 unobserved <- zone_corrections %>% filter(nchar(TRIP.x)<1)
-
 unobserved$LANDED_DATE <- lubridate::as_date(unobserved$LANDED_DATE)
+unobserved$DATE_FISHED <- lubridate::dmy(unobserved$DATE_FISHED)
 
-##Run this on each fleet type that is required for the analysis
-est_5Z_2021<- fishin_CHPs(type="MOBILE", stock = "5Z", dateStart = "2021-01-01", dateEnd= "2021-12-31", returnISDB=TRUE, useLocal = T, data.dir='C:/LocalDataDump', socks=T)
+##Run this on each fleet type with unobserved trips with missing zones
+mobile_5Z_2021<- fishin_CHPs(type="MOBILE", stock = "5Z", dateStart = "2021-01-01", dateEnd= "2021-12-31", returnISDB=TRUE, useLocal = T, data.dir='C:/LocalDataDump', socks=T) #change the dates if you want a different year
 
-chpVMS<-get_vmstracks(data=est_5Z_2021, 
-                      oracle.username= oracle.username, 
-                      oracle.password=oracle.password, 
-                      oracle.dsn=oracle.dsn, 
-                      usepkg="roracle")
+fixed_5Z_2021<- fishin_CHPs(type="FIXED", stock = "5Z", dateStart = "2021-01-01", dateEnd= "2021-12-31", returnISDB=TRUE, useLocal = T, data.dir='C:/LocalDataDump', socks=T) #change the dates if you want a different year
 
-#Filter VMS data using VR_NUMBER and LANDED_DATE from unobserved trips missing zone numbers
+mobileVMSRaw <- Mar.utils::VMS_from_MARFIS(df=mobile_5Z_2021$marf$MARF_TRIPS, VR_field = "VR_NUMBER_FISHING", usepkg = "roracle", make_segments = F, LANDED_field = "T_DATE2" )
+mobileVMSRaw <- mobileVMSRaw[["marf_VMS"]]
 
-chpVMS_filter <- chpVMS %>% filter(VR_NUMBER %in% unobserved$VR_NUMBER_FISHING)
+fixedVMSRaw <- Mar.utils::VMS_from_MARFIS(df=fixed_5Z_2021$marf$MARF_TRIPS, VR_field = "VR_NUMBER_FISHING", usepkg = "roracle", make_segments = F, LANDED_field = "T_DATE2" ) #Depending on the license conditions, there may only be VMS data for unobserved trips of mobile gear
+fixedVMSRaw <- fixedVMSRaw[["marf_VMS"]]
 
-quick_map(est_5Z_2021, vms = chpVMS_filter)
+chpVMS <- mobileVMSRaw#If only mobile VMS data are available
+#chpVMS <- rbind(mobileVMS, fixedVMS) #If both mobile and fixed VMS data are available
 
+#Filter existing VMS data using VR_NUMBER and LANDED_DATE from unobserved trips missing zone numbers
+
+chpVMS$DATE <- as.Date(format(as.POSIXct(chpVMS$POSITION_UTC_DATE,format='%Y/%m/%d %H:%M:%S'),format='%Y/%m/%d'))
+chpVMS_filter <- chpVMS %>% 
+  filter(VR_NUMBER %in% unobserved$VR_NUMBER_FISHING & DATE %in% unobserved$DATE_FISHED) %>% 
+  group_by(VR_NUMBER, DATE) %>%
+  dplyr::summarize(MeanLat = mean(LATITUDE, na.rm=TRUE), MeanLon = mean(LONGITUDE, na.rm=TRUE)) #Available VMS data for unobserved trips
+
+chpVMS_filter <- as.data.frame(chpVMS_filter)
+
+unobserved <- left_join(unobserved, chpVMS_filter, by = (c("VR_NUMBER_FISHING" = "VR_NUMBER", "DATE_FISHED" = "DATE")))
+
+unobserved <- Mar.utils::identify_area(df=unobserved, lat.field = "MeanLat", lon.field = "MeanLon",
+                                     agg.poly.shp = "S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 2022/zones.shp",
+                                     agg.poly.field = "Id")
+
+unobserved$ZONE <- unobserved$Id
+
+#Bind observed and unobserved dataframes together and remove trips missing Zone
+
+head(zone_correct)
+head(observed)
+head(unobserved)
+
+observed1 <- observed %>% select(c(1:23))
+unobserved1 <- unobserved %>% select(c(1:23))
+
+temp <- rbind(zone_correct, setNames(observed1, names(zone_correct)), setNames(unobserved1, names(zone_correct)))
+
+marfis <- temp %>% filter(ZONE>=1)
+noZone <- temp %>% filter(!ZONE>=1)
+
+rm(list=setdiff(ls(), c("marfis", "isdbtrips", "noZone")))
 
 ###Step 7. Identify Non-Commercial Trips--------------------
 
 head(isdbtrips) #Load this in script EGB_ISDB.R
-
 isdb_noncom <- isdbtrips %>% filter(SETCD_ID == 7) %>% select(TRIP, SETCD_ID)
-
-marfis <- marfis %>% rename(TRIP = TRIP.x)
-
+marfis <- marfis %>% dplyr::rename(TRIP = TRIP.x)
 marfis <- left_join(marfis, isdb_noncom, by="TRIP")
-
 noncomtrips <- marfis %>% filter(SETCD_ID == 7) #This is the data frame where the removed non-commercial trips appear
-
 marfis <- marfis %>% filter(is.na(SETCD_ID) | SETCD_ID != 7) #Data frame with non-commercial trips removed
 
+rm(isdb_noncom)
+
 ###Step 8. Identify no-panel trips---------------------------
+
+channel <- ROracle::dbConnect(DBI::dbDriver("Oracle"), username=oracle.username, password=oracle.password, oracle.dsn)  
 
 separator <- dbGetQuery(channel, "select a.CFV, a.VESSEL_NAME, b.TRIP, b.LANDING_DATE, c.GEARCD_ID, d.GEARFCD_ID, Count(e.SET_NO)
 
@@ -127,13 +160,13 @@ group by a.CFV, a.VESSEL_NAME, b.TRIP, b.LANDING_DATE, c.GEARCD_ID, d.GEARFCD_ID
 
 sep_nopan <- separator %>% filter(GEARFCD_ID==89) %>% select(TRIP, GEARFCD_ID)
 
-marfis <- left_join(marfis, sep_nopan, by=c("TRIP.x" = "TRIP"))
+marfis <- left_join(marfis, sep_nopan, by=c("TRIP" = "TRIP"))
 
 nopaneltrips <- marfis %>% filter(GEARFCD_ID == 89) #This is the data frame where the removed no panel trips appear
 
 marfis <- marfis %>% filter(is.na(GEARFCD_ID) | GEARFCD_ID != 89) #Data frame with no panel trips removed
 
-
+rm(sep_nopan, separator)
 
 ###Step 9. Identify non-cod/had observed trips-------------------------
 
@@ -154,9 +187,13 @@ group by a.CFV, a.VESSEL_NAME, b.TRIP, c.GEARCD_ID, b.LANDING_DATE, d.SPECSCD_ID
 
 noncodhad <- sought %>% group_by(TRIP) %>% filter(!SPECSCD_ID %in% c(10,11)) %>% select(TRIP, SPECSCD_ID) %>% distinct(TRIP, SPECSCD_ID, .keep_all = TRUE)
 
-marfis <- left_join(marfis, noncodhad, by=c("TRIP.x" = "TRIP"))
+marfis <- left_join(marfis, noncodhad, by=c("TRIP" = "TRIP"))
 
-noncodhad <- marfis %>% filter(!SPECSCD_ID %in% c(10, 11) & !is.na(noncodhad$SPECSCD_ID))
+noncodhad <- marfis %>% filter(!SPECSCD_ID %in% c(10, 11) & !is.na(SPECSCD_ID))
+
+marfis <- marfis %>% filter(SPECSCD_ID %in% c(10, 11) | is.na(SPECSCD_ID))
+
+rm(sought)
 
 ###Step 10. Check cod/had ratios and pollock ratios---------------------
 
@@ -173,7 +210,7 @@ df$codhad_ratio <- df$X100/df$X110 #Calculate cod:had ratio
 df$test1<-with(df, ifelse(codhad_ratio < 0.8, "met", "not met")) #Basic ifelse; evaluation of a value for each record/set.
 temp1<-subset(df, select=c('TRIP_ID','test1')) #Removes the value column, to help apply the test1 command to groups instead of individual sets.
 temp1<-unique(temp1) #removes replicates in the group-level test dataset.
-temp2 <- temp1 %>% group_by(TRIP_ID) %>% summarise(n = n()) %>% filter(n==1) #select trips where sets all met or all did not meet conditions
+temp2 <- temp1 %>% group_by(TRIP_ID) %>% dplyr::summarise(n = n()) %>% filter(n==1) #select trips where sets all met or all did not meet conditions
 temp3 <- temp1 %>% filter(TRIP_ID %in% temp2$TRIP_ID & test1 == "not met") #select trips where all sets did not meet the condition
 names(temp3)[2]<-'test2' #Renames the test field to faciliate merging with df
 df2<-merge(df, temp3, all=TRUE) #merges the two, identifying groups which did not meet the conditions for at least one set
@@ -225,16 +262,18 @@ df$pol_ratio <- df$X170>(df$X100+df$X110)
 pol_directed <- df %>% filter(pol_ratio == "TRUE") #dataframe with pollock directed sets
 haddock_directed <- df %>% filter(pol_ratio == "FALSE") #dataframe with haddock directed sets
 
+rm(df, df2, cod_directed1, cod_directed2)
 
 ###Step 11. Remove unwanted records----------------------------
 
 #quarters with 100% observer coverage
+
 noncodhad #sets directed for species other than cod or haddock
 cod_directed #cod directed sets or trips
 pol_directed #pollock directed sets or trips
 nopaneltrips #no panel trips
 noncomtrips #non-commercial trips
-#trips with no zones
+noZone #trips with no zones
 
 ###Step 12. Aggregate data----------------------------------
 
