@@ -8,6 +8,7 @@ library(ROracle)
 library(tidyverse)
 library(lubridate)
 library(fuzzyjoin)
+library(dplyr)
 
 #Step 1. Load MARFIS data from Access query (to be replaced with EGB_MARFIS.R code once finished)
 
@@ -15,7 +16,7 @@ marfis <- read.csv('S:/Science/Population Ecology/Georges Bank/Spec Comp/2021 20
 
 marfis$LANDED_DATE <- dmy(marfis$LANDED_DATE)
 
-marfis <- rename(marfis, TRIP = DATA_VALUE)
+marfis <- dplyr::rename(marfis, TRIP = DATA_VALUE)
 
 #Step 2. Load ISDB data directly
 
@@ -42,7 +43,7 @@ order by b.TRIP")
 
 isdb$LANDING_DATE <- as.Date(isdb$LANDING_DATE)
 isdb$LANDED_DATE <- isdb$LANDING_DATE
-isdb <- rename(isdb, VR_NUMBER_FISHING = CFV)
+isdb <- dplyr::rename(isdb, VR_NUMBER_FISHING = CFV)
 
 isdb$VR_NUMBER_FISHING <- as.integer(isdb$VR_NUMBER_FISHING)
 
@@ -116,8 +117,8 @@ marfis_qaqc <- rbind(good1, good2,
 #MARFIS and ISDB errors to report to CDD and Observer Program
 
 #MARFIS errors
-marfis_error1 <- marfis_error1 %>% rename(ISDBTRIP = TRIP.y) %>% select(c(1:21, 33), ISDBTRIP)
-marfis_error2 <- marfis_error2 %>% rename(ISDBTRIP = TRIP) %>% select(c(1:21, 37), ISDBTRIP)
+marfis_error1 <- marfis_error1 %>% dplyr::rename(ISDBTRIP = TRIP.y) %>% select(c(1:21, 33), ISDBTRIP)
+marfis_error2 <- marfis_error2 %>% dplyr::rename(ISDBTRIP = TRIP) %>% select(c(1:21, 37), ISDBTRIP)
 
 names(marfis_error2) <- names(marfis_error1)
 
@@ -137,4 +138,4 @@ isdb_errors <- good6 %>% mutate(COMMENT = "trip entered in MARFIS but not ISDB")
   distinct(VR_NUMBER_FISHING.x, TRIP_ID, LANDED_DATE.x, TRIP.x)#Observed trips entered in MARFIS but not entered in the ISDB
 #write.csv(isdb_errors, "isdb_missing.csv") #File sent to observer program as outstanding data not yet entered
 
-rm(list=setdiff(ls(), "marfis_qaqc"))
+rm(list=setdiff(ls(), c("marfis_qaqc", "isdbtrips")))
