@@ -238,25 +238,20 @@ temp2 <- df %>%
 temp3 <- df %>%
   filter(TRIP_ID %in% temp2$TRIP_ID) %>%
   select(LOG_EFRT_STD_INFO_ID, TRIP_ID, codhad_ratio, test1) %>%
-  group_split(TRIP_ID) #trip dataframes in list. check to make sure 'not met' occurs only at the end of the trip
+  arrange(LOG_EFRT_STD_INFO_ID) %>%
+  group_split(TRIP_ID) #trip with high cod ratio at the end of the trip in list. check to make sure 'not met' occurs only in the last set of the trip
 
-temp4 <- df %>% 
-  filter(TRIP_ID %in% temp2$TRIP_ID) %>%
-  filter(test1 == "met") #select data from the trips with high codhad ratios that meet the condition
+cod_directed2 <- df %>% filter(LOG_EFRT_STD_INFO_ID %in% temp2$LOG_EFRT_STD_INFO_ID) #cod directed sets at the end of trips
+cod_directed <- rbind(cod_directed1, setNames(cod_directed2, names(cod_directed1)))
 
-temp5 <- df %>%
-  filter(!TRIP_ID %in% temp2$TRIP_ID) #select all data that are not from the trips with the high/late cod had ratios
-
-cod_directed2 <- df %>% filter(TRIP_ID %in% temp2$TRIP_ID) %>% filter(test1 == "not met")
-cod_directed <- rbind(cod_directed1, setNames(cod_directed2, names(cod_directed1))) 
-cod_directed$test2 <- NULL #dataframe of sets identified as cod directed
-
-df <- rbind(temp4, temp5)
+df <- df %>% filter(!LOG_EFRT_STD_INFO_ID %in% temp2$LOG_EFRT_STD_INFO_ID)
 df$test1 <- NULL #dataframe of remaining sets identified as not cod directed
 
-rm(temp1, temp2, temp3, temp4, temp5)
+rm(temp1, temp2, temp3, cod_directed1, cod_directed2)
 
 #Remove sets where pollock landings are greater than combined cod and haddock landings
+
+df <- df %>% replace_na(list(X100 = 0, X110 = 0, X170 = 0))
 
 df$pol_ratio <- df$X170>(df$X100+df$X110)
 pol_directed <- df %>% filter(pol_ratio == "TRUE") #dataframe with pollock directed sets
