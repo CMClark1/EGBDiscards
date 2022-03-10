@@ -259,12 +259,7 @@ haddock_directed <- df %>% filter(pol_ratio == "FALSE") #dataframe with haddock 
 
 rm(df, df2, cod_directed1, cod_directed2)
 
-###Step 11a. Determine quarters with 100% observer coverage---------------
-
-head(haddock_directed)
-
-
-###Step 11b. Remove unwanted records----------------------------
+###Step 11. Removed unwanted records----------------------------
 
 #quarters with 100% observer coverage
 
@@ -286,10 +281,19 @@ rm(rm1, rm2, rm3, rm4, rm5, rm6)
 
 ###Step 12. Aggregate data----------------------------------
 
-head(marfis) #replace with appropriate dataframe after I figure out the directed issue
-
-aggregated <- marfis %>%
+aggregated <- haddock_directed %>%
   group_by(VR_NUMBER_FISHING, VESSEL_NAME.x, LICENCE_ID, TC, LC, TRIP_ID, LANDED_DATE, GEAR_CODE, Q, TRIP, ZONE, SECTOR) %>%
   dplyr::summarize(COD = sum(X100, na.rm=TRUE), HAD = sum(X110, na.rm=TRUE), POL = sum(X170, na.rm=TRUE)) 
 
+###Step 12b. Check for quarters with 100% observer coverage
 
+aggregated$OBS <- ifelse(aggregated$TRIP == "", "N", "Y")
+aggregated$COUNT <- 1
+
+pivot <- aggregated %>% group_by(SECTOR, Q, ZONE, OBS) %>% dplyr::summarize(count = n())
+
+OBSY <- pivot %>% add_count(SECTOR, Q, ZONE) %>% filter(n <= 1, OBS == "Y") #Fleet/quarter/zone with only observed trips (100% coverage)
+OBSN <- pivot %>% add_count(SECTOR, Q, ZONE) %>% filter(n <= 1, OBS == "N") #Fleet/quarter/zone with only unobserved trips
+OBSYN <- pivot %>% add_count(SECTOR, Q, ZONE) %>% filter(n >1) #Fleet/quarter/zone with both observed and unobserved trips
+
+##SHOULD I REMOVE LONGLINE?? COD DIRECTED??
