@@ -285,15 +285,16 @@ aggregated <- haddock_directed %>%
   group_by(VR_NUMBER_FISHING, VESSEL_NAME.x, LICENCE_ID, TC, LC, TRIP_ID, LANDED_DATE, GEAR_CODE, Q, TRIP, ZONE, SECTOR) %>%
   dplyr::summarize(COD = sum(X100, na.rm=TRUE), HAD = sum(X110, na.rm=TRUE), POL = sum(X170, na.rm=TRUE)) 
 
-###Step 12b. Check for quarters with 100% observer coverage
+###Step 12b. Check for quarters with 100% observer coverage and remove them; remove longline
 
-aggregated$OBS <- ifelse(aggregated$TRIP == "", "N", "Y")
-aggregated$COUNT <- 1
+aggregated <- aggregated %>% filter(GEAR_CODE != 51) #remove longline
 
-pivot <- aggregated %>% group_by(SECTOR, Q, ZONE, OBS) %>% dplyr::summarize(count = n())
+coverage1 <- aggregated %>% group_by (SECTOR, Q) %>% mutate(OBS = 1) %>% summarise(UNOBS = sum(OBS[TRIP == ""]), OBS = sum(OBS[TRIP != ""])) %>% mutate(COVERAGE=OBS/(OBS+UNOBS)) %>% filter(COVERAGE == 1) #Quarters with 100% observer coverage
 
-OBSY <- pivot %>% add_count(SECTOR, Q, ZONE) %>% filter(n <= 1, OBS == "Y") #Fleet/quarter/zone with only observed trips (100% coverage)
-OBSN <- pivot %>% add_count(SECTOR, Q, ZONE) %>% filter(n <= 1, OBS == "N") #Fleet/quarter/zone with only unobserved trips
-OBSYN <- pivot %>% add_count(SECTOR, Q, ZONE) %>% filter(n >1) #Fleet/quarter/zone with both observed and unobserved trips
+coverage2 <- aggregated %>% group_by(SECTOR) %>% mutate(OBS=1) %>% summarise(UNOBS = sum(OBS[TRIP == ""]), OBS = sum(OBS[TRIP != ""])) %>% mutate(COVERAGE=OBS/(OBS+UNOBS)) %>% filter(COVERAGE == 1) #Fleets with 100% observer coverage
 
-##SHOULD I REMOVE LONGLINE?? COD DIRECTED??
+cov100perc <- aggregated %>% filter(SECTOR %in% coverage2$SECTOR) #Dataframe of trips from sectors with 100% coverage
+
+aggregated <- aggregated %>% filter(!SECTOR %in% coverage2$SECTOR)
+
+
