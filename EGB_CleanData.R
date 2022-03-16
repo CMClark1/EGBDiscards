@@ -289,6 +289,8 @@ aggregated <- haddock_directed %>%
 
 aggregated <- aggregated %>% filter(GEAR_CODE != 51) #remove longline
 
+covsummary <- aggregated %>% group_by(SECTOR) %>% mutate(OBS = 1) %>% summarise(UNOBS = sum(OBS[TRIP == ""]), OBS = sum(OBS[TRIP != ""])) %>% mutate(COVERAGE=OBS/(OBS+UNOBS)) #observer coverage summary
+
 coverage1 <- aggregated %>% group_by (SECTOR, Q) %>% mutate(OBS = 1) %>% summarise(UNOBS = sum(OBS[TRIP == ""]), OBS = sum(OBS[TRIP != ""])) %>% mutate(COVERAGE=OBS/(OBS+UNOBS)) %>% filter(COVERAGE == 1) #Quarters with 100% observer coverage
 
 coverage2 <- aggregated %>% group_by(SECTOR) %>% mutate(OBS=1) %>% summarise(UNOBS = sum(OBS[TRIP == ""]), OBS = sum(OBS[TRIP != ""])) %>% mutate(COVERAGE=OBS/(OBS+UNOBS)) %>% filter(COVERAGE == 1) #Fleets with 100% observer coverage
@@ -297,4 +299,49 @@ cov100perc <- aggregated %>% filter(SECTOR %in% coverage2$SECTOR) #Dataframe of 
 
 aggregated <- aggregated %>% filter(!SECTOR %in% coverage2$SECTOR)
 
+#Step 12c. Group aggregated data for analysis based on conditions
 
+#If all trips are observed, assign "1" for "No Discards" or "UK" for "Unknown."
+ag1 <- aggregated %>% 
+  group_by (SECTOR, ZONE, Q) %>% 
+  mutate(OBS = 1) %>% summarise(UNOBS = sum(OBS[TRIP == ""]), OBS = sum(OBS[TRIP != ""])) %>%
+  mutate(TOTAL = UNOBS + OBS) %>% 
+  mutate(DGROUP = if_else(OBS == TOTAL, "1", "UK"))
+
+group1 <- ag1 %>% filter(DGROUP == 1) #Group 1. No discards.
+
+#If observed trips are > 0.2 of total and > 1, "2" for "Good to Go" or "UK" for "Unknown."
+ag2 <- ag1 %>% filter(DGROUP == "UK") %>%
+  mutate(DGROUP = if_else((OBS/TOTAL)>0.2 & OBS>=1, "2", "UK")) 
+
+group2 <- ag2 %>% filter(DGROUP == 2) #Group 2. Good to Go.
+
+#If there are no observed trips or observed trips are <0.2 of the total, "3" for "Needs Friend" or "UK" for "Unknown."
+ag3 <- ag2 %>% filter(DGROUP == "UK") %>%
+  mutate(DGROUP = if_else(OBS == 0 | (OBS/TOTAL <=0.2 & OBS == 1), "3", "UK"))
+
+group3 <- ag3 %>% filter(DGROUP == 3) #Group 3. Needs a Friend.
+
+#Bind the dataframes back together
+group1 <- group1 %>% mutate_at(vars(1:7), as.numeric)
+group2 <- group2 %>% mutate_at(vars(1:7), as.numeric)
+bind <- rbind(group1, group2, group3)
+
+bind <- as.data.frame(arrange(bind, SECTOR, ZONE, Q, DGROUP))
+
+##Manually group the aggregated trip data ## REPLACE THIS
+
+aggregated <- aggregated %>% mutate(GROUP = case_when(
+                            SECTOR == 311 ~ 1,
+                            SECTOR == 881 & Q == 1 & ZONE == 1 ~ 2,
+                            SECTOR == 881 & Q %in% c(2,3) & ZONE == 1 ~ 3,
+                            SECTOR == 881 & Q == 4 & ZONE == 1 ~ 4,
+                            SECTOR == 881 & Q == 1 & ZONE == 2 ~ 5,
+                            SECTOR == 881 & Q == 2 & ZONE == 2 ~ 6, 
+                            SECTOR == 881 & Q == 3 & ZONE == 2 ~ 7,
+                            SECTOR == 881 & Q == 4 & ZONE == 2 ~ 8,
+                            SECTOR == 881 & Q == 1 & ZONE == 3 ~ 9, 
+                            SECTOR == 881 & Q %in% c(2,3,4) & ZONE == 3 ~ 10,
+                            SECTOR == 881 & Q %in% c(1,2,3,4) & ZONE %in% c(4,5) ~ 11,
+                            SECTOR == 885 ~ 12,
+                            SECTOR == 3328 ~ 13))
