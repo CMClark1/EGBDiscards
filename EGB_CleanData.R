@@ -330,22 +330,18 @@ bind <- rbind(group1, group2, group3)
 
 bind <- as.data.frame(arrange(bind, SECTOR, ZONE, Q, DGROUP))
 
+##Manually group the aggregated trip data ## FN GROUPED WITH MOBILE 881
 
-
-
-##Manually group the aggregated trip data ## REPLACE THIS
-
-aggregated %>% mutate(GROUP = case_when(
+aggroup <- aggregated %>% mutate(GROUP = case_when(
                             SECTOR == 311 ~ "311_Z12345_Q1234",
-                            SECTOR == 881 & Q == 1 & ZONE == 1 ~ "881_Z1_Q1",
-                            SECTOR == 881 & Q %in% c(2,3) & ZONE == 1 ~ "881_Z1_Q23",
-                            SECTOR == 881 & Q == 4 & ZONE == 1 ~ "881_Z1_Q4",
-                            SECTOR == 881 & Q == 1 & ZONE == 2 ~ "881_Z2_Q1",
-                            SECTOR == 881 & Q == 2 & ZONE == 2 ~ "881_Z2_Q2", 
-                            SECTOR == 881 & Q == 3 & ZONE == 2 ~ "881_Z2_Q3",
-                            SECTOR == 881 & Q == 4 & ZONE == 2 ~ "881_Z2_Q4",
-                            SECTOR == 881 & Q == 1 & ZONE == 3 ~ "881_Z3_Q1", 
-                            SECTOR == 881 & Q %in% c(2,3,4) & ZONE == 3 ~ "881_Z3_Q234",
-                            SECTOR == 881 & Q %in% c(1,2,3,4) & ZONE %in% c(4,5) ~ "881_Z45_Q1234",
-                            SECTOR == 885 ~ "885_Z12345_Q1234",
-                            SECTOR == 3328 ~ "3328_Z12345_Q1234"))
+                            SECTOR %in% c(881, 3328) & Q == 1 & ZONE == 1 ~ "881_Z1_Q1",
+                            SECTOR %in% c(881, 3328) & Q %in% c(2,3) & ZONE == 1 ~ "881_Z1_Q23",
+                            SECTOR %in% c(881, 3328) & Q == 4 & ZONE == 1 ~ "881_Z1_Q4",
+                            SECTOR %in% c(881, 3328) & Q == 1 & ZONE == 2 ~ "881_Z2_Q1",
+                            SECTOR %in% c(881, 3328) & Q == 2 & ZONE == 2 ~ "881_Z2_Q2", 
+                            SECTOR %in% c(881, 3328) & Q == 3 & ZONE == 2 ~ "881_Z2_Q3",
+                            SECTOR %in% c(881, 3328) & Q == 4 & ZONE == 2 ~ "881_Z2_Q4",
+                            SECTOR %in% c(881, 3328) & Q == 1 & ZONE == 3 ~ "881_Z3_Q1", 
+                            SECTOR %in% c(881, 3328) & Q %in% c(2,3,4) & ZONE == 3 ~ "881_Z3_Q234",
+                            SECTOR %in% c(881, 3328) & Q %in% c(1,2,3,4) & ZONE %in% c(4,5) ~ "881_Z45_Q1234",
+                            SECTOR == 885 ~ "885_Z12345_Q1234"))
