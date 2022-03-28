@@ -279,6 +279,8 @@ removed <- rbind(rm1,
 
 rm(rm1, rm2, rm3, rm4, rm5, rm6)
 
+#write.csv(removed, "removedrecords.csv")
+
 ###Step 12. Aggregate data----------------------------------
 
 aggregated <- haddock_directed %>%
@@ -298,6 +300,8 @@ coverage2 <- aggregated %>% group_by(SECTOR) %>% mutate(OBS=1) %>% summarise(UNO
 cov100perc <- aggregated %>% filter(SECTOR %in% coverage2$SECTOR) #Dataframe of trips from sectors with 100% coverage
 
 aggregated <- aggregated %>% filter(!SECTOR %in% coverage2$SECTOR)
+
+#write.csv(aggregated, "MARFISXtab_Aggregated.csv")
 
 #Step 12c. Group aggregated data for analysis based on conditions
 
