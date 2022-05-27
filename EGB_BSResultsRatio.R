@@ -1,6 +1,6 @@
 ####################
 # Bootstrap Results Ratio
-# Caira Clark
+# Caira Clark and Tim Barrett
 # 18 February 2021
 ####################
 
@@ -75,6 +75,6 @@ data$DISCARDS[is.na(data$DISCARDS)] <- 0
 
 #Determine if the values are significant using BS 1000 APL file. Then create another data column for significant/not significant.
 
-data$SIGNIFICANT <- c(0,0,0,0,0,0,1,0,1,0,0)
+  data$SIGNIFICANT <- c(1,1,0,0,0,0,0,0,0,0,0)
 
 data$SIGDISCARDS <- data$DISCARDS*data$SIGNIFICANT

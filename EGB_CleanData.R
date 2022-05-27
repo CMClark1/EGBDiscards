@@ -349,3 +349,7 @@ aggroup <- aggregated %>% mutate(GROUP = case_when(
                             SECTOR %in% c(881, 3328) & Q %in% c(2,3,4) & ZONE == 3 ~ "881_Z3_Q234",
                             SECTOR %in% c(881, 3328) & Q %in% c(1,2,3,4) & ZONE %in% c(4,5) ~ "881_Z45_Q1234",
                             SECTOR == 885 ~ "885_Z12345_Q1234"))
+
+#Summarise the landings by observed and unobserved for each group
+aggroup %>% mutate(OBS=ifelse(TRIP=="",0,1)) %>% group_by(GROUP,OBS) %>% summarise(COD = sum(COD)) %>% pivot_wider(names_from=OBS, values_from = COD)
+
