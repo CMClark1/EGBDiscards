@@ -12,6 +12,15 @@ library(ROracle)
 library(leaflet)
 library(gstat)
 
+##If you haven't downloaded local copies of the databases, you'll need them for this
+
+#library(devtools)
+#install_github('Maritimes/Mar.datawrangling')
+#library(Mar.datawrangling)
+#get_data('marfis', data.dir ="C:/LocalDataDump)
+#get_data('isdb', data.dir ="C:/LocalDataDump)
+
+
 ###Load QAQC'd marfis data from file EGB_QAQC.R----------------------
 
 head(marfis_qaqc)
