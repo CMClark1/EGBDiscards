@@ -313,8 +313,10 @@ aggregated <- aggregated %>% filter(!SECTOR %in% coverage2$SECTOR)
 #write.csv(aggregated, "MARFISXtab_Aggregated.csv")
 
 #Step 12c. Group aggregated data for analysis based on conditions
+#This part of the script groups by sector (fishery), zone, and quarter.
 
 #If all trips are observed, assign "1" for "No Discards" or "UK" for "Unknown."
+#If all trips are observed, there were no discards, so those sector/zone/quarter combinations with everything observed are removed from the analysis.
 ag1 <- aggregated %>% 
   group_by (SECTOR, ZONE, Q) %>% 
   mutate(OBS = 1) %>% summarise(UNOBS = sum(OBS[TRIP == ""]), OBS = sum(OBS[TRIP != ""])) %>%
@@ -324,16 +326,20 @@ ag1 <- aggregated %>%
 group1 <- ag1 %>% filter(DGROUP == 1) #Group 1. No discards.
 
 #If observed trips are > 0.2 of total and > 1, "2" for "Good to Go" or "UK" for "Unknown."
+# If observed trips account for more than 20% of trips in a sector/zone/quarter and are >1, those s/z/q combinations can be analysed on their own using the in house APL program ("good to go"). That program, which will hopefully be transferred to R eventually, has limits on the ratio between the observed/unobserved trips.
 ag2 <- ag1 %>% filter(DGROUP == "UK") %>%
   mutate(DGROUP = if_else((OBS/TOTAL)>0.2 & OBS>=1, "2", "UK")) 
 
 group2 <- ag2 %>% filter(DGROUP == 2) #Group 2. Good to Go.
 
 #If there are no observed trips or observed trips are <0.2 of the total, "3" for "Needs Friend" or "UK" for "Unknown."
+#If observed trips are <20% within a s/z/q, we need to group them together so that the ratio between observed/unobserved trips is adequate for the APL program.
 ag3 <- ag2 %>% filter(DGROUP == "UK") %>%
   mutate(DGROUP = if_else(OBS == 0 | (OBS/TOTAL <=0.2 & OBS == 1), "3", "UK"))
 
 group3 <- ag3 %>% filter(DGROUP == 3) #Group 3. Needs a Friend.
+
+#Then the dataframes are bound back together so that you can see which ones need to be grouped. This year, we still did that manually but in the future, it could be done systematically. The 'hierarchy' for grouping is: first group quarters. If that doesn't solve it, then group zones. If that doesn't solve it, then group sectors. Grouping sectors is very rare.
 
 #Bind the dataframes back together
 group1 <- group1 %>% mutate_at(vars(1:7), as.numeric)
